@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prism-router"
+version = "0.1.0"
+description = "面向 OpenAI 生态的智能 LLM 网关：支持任务复杂度路由、零开销直连透传与针对性 Prompt 改写，兼顾本地/云端调度与 API 大幅降本"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+keywords = ["llm", "router", "gateway", "fastapi", "ai", "openai", "claude", "rewriter"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
+    "httpx>=0.27",
+    "tenacity>=8.0",
+    "rich>=13.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kongbai26/prism_router"
+Repository = "https://github.com/kongbai26/prism_router"
+Issues = "https://github.com/kongbai26/prism_router/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "httpx>=0.27",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pydantic>=2.0",
+    "pre-commit>=4.0",
+]
+
+[project.scripts]
+prism-router = "prism_router.cli:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # function call in default argument (FastAPI Depends)
+    "SIM108", # ternary operator (readability preference)
+    "UP007",  # X | Y union type (keep Optional for now)
+    "RUF001", # ambiguous unicode in string (Chinese characters)
+    "RUF002", # ambiguous unicode in docstring (Chinese characters)
+    "RUF003", # ambiguous unicode in comment (Chinese characters)
+    "SIM105", # contextlib.suppress (try-except-pass is fine for cleanup code)
+    "SIM117", # multiple-with-statements (nested with is clearer in tests)
+    "SIM103", # needless-bool (explicit if-return is clearer)
+    "SIM102", # collapsible-if (nested ifs are sometimes clearer)
+    "RUF059", # unused unpacked variable (tests use tuple unpacking for clarity)
+    "RUF005", # collection-literal-concatenation (list concat is readable)
+    "B007",   # unused loop control variable
+    "E701",   # multiple statements on one line (compact CLI code)
+    "E402",   # module import not at top (test fixtures)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["prism_router"]
+
+[tool.mypy]
+python_version = "3.10"
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false

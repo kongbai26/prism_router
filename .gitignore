@@ -1,0 +1,52 @@
+# 运行时私有配置（请使用 config.example.yaml 作为模版）
+config.yaml
+.env
+.env.*
+!.env.example
+.envrc
+
+# 私钥与证书
+*.pem
+*.key
+*.p12
+*.pfx
+
+# 日志与持久化数据库
+logs/
+*.db
+*.db-journal
+*.db-wal
+*.pid
+prism_router.pid
+routing.generated.yaml
+
+# Python 编译与打包缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# 测试与代码分析缓存
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+env/
+
+# IDE 与系统文件
+.DS_Store
+.vscode/
+.idea/
+.claude/
+*.swp
+*~

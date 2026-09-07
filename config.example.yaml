@@ -1,0 +1,222 @@
+# ============================================================
+# Prism Router 配置文件示例
+# 复制为 config.yaml 后修改
+# ============================================================
+
+# ----------------------------------------------------------
+# 服务配置
+# ----------------------------------------------------------
+server:
+  host: "127.0.0.1"
+  port: 4671
+  workers: 1
+  api_key: "${PRISM_ROUTER_API_KEY}"  # 对外监听时必填，客户端使用 Authorization: Bearer <key>
+  admin_api_key: "${PRISM_ROUTER_ADMIN_API_KEY}"  # 管理接口独立密钥；留空时禁用 /admin
+  proxy: ""              # 代理地址，留空=不使用代理。如 "http://127.0.0.1:7890"
+  verify_ssl: true       # 上游 API 的 TLS 证书验证；仅自签名内网服务可显式关闭
+  write_codex_catalog: false  # 是否写入宿主机 Codex 配置，默认关闭
+  dedup_window_seconds: 10  # 请求去重窗口（秒），0=不启用
+
+# ----------------------------------------------------------
+# 缓存配置
+# ----------------------------------------------------------
+cache:
+  enabled: false
+  ttl_seconds: 300
+  max_entries: 1000
+
+# ----------------------------------------------------------
+# 并发限制（保护本地模型）
+# ----------------------------------------------------------
+rate_limit:
+  enabled: false
+  local_max_concurrent: 3
+
+# ==========================================================
+#  路由策略
+# ==========================================================
+routing:
+  mode: "manual"                    # auto = 自动分配 tier，manual = 手动填写
+  auto_strategy: "cost"             # auto 模式: "cost" 按成本 / "tier" 按 tier 字段
+  output_cost_weight: 3
+
+  simple: "ollama/qwen2.5:1.5b"    # 简单请求模型
+  mid: "openai/gpt-4o-mini"        # 中等请求模型
+  complex: "openai/gpt-4o"         # 复杂请求模型
+
+  model_pool: []                    # auto 模式参与路由的模型列表
+  aliases: {}                       # 模型别名，如 {"fast": "openai/gpt-4o-mini"}
+
+  tools_enabled: true
+  tools_policy: "auto"              # auto / always / never
+  passthrough_pool: []
+
+  # 分类器
+  classifier: "rules"               # rules / local / cloud
+  classifier_model: ""              # local/cloud 模式使用的分类器模型
+  classifier_failure_threshold: 3
+  classifier_timeout_enabled: true
+  classifier_timeout_seconds: 15
+  classifier_probe_enabled: true
+  classifier_probe_interval: 30
+  classifier_local_rounds: 3
+  classifier_local_max_chars: 300
+  classifier_local_max_tokens: 4096
+  classifier_cloud_rounds: 6
+  classifier_cloud_max_chars: 900
+  classifier_cloud_max_tokens: 256
+  classify_prompt: "prism_router/prompts/classify.md"
+
+# ----------------------------------------------------------
+# 模型池
+# ----------------------------------------------------------
+models:
+  # ── 本地模型示例 ──
+  ollama/qwen2.5:1.5b:
+    model: "qwen2.5:1.5b"
+    base_url: "http://localhost:11434/v1/chat/completions"
+    backend: "ollama"
+    source: "local"
+    context: 32000
+    connect_timeout: 8.0            # 单独覆盖该模型的连接超时（秒，可选，默认继承 fallback 配置）
+    cost_in: 0
+    cost_out: 0
+    tier: simple
+    description: "小型本地模型，零成本"
+    tags: ["chat", "fast"]
+
+  # ── 云端模型示例 ──
+  openai/gpt-4o-mini:
+    model: "gpt-4o-mini"
+    base_url: "https://api.openai.com/v1/chat/completions"
+    api_key: "${OPENAI_API_KEY}"
+    source: "cloud"
+    context: 128000
+    cost_in: 0.00015
+    cost_out: 0.0006
+    tier: mid
+    description: "快速且便宜，适合日常任务"
+    tags: ["chat", "code"]
+    supports_tools: true
+
+  openai/gpt-4o:
+    model: "gpt-4o"
+    base_url: "https://api.openai.com/v1/chat/completions"
+    api_key: "${OPENAI_API_KEY}"
+    source: "cloud"
+    context: 128000
+    cost_in: 0.0025
+    cost_out: 0.01
+    tier: complex
+    description: "最强推理能力，适合复杂任务"
+    tags: ["chat", "code", "reasoning"]
+    supports_tools: true
+
+# ----------------------------------------------------------
+# Fallback
+# ----------------------------------------------------------
+fallback:
+  enabled: true
+  max_retries: 3                    # 业务错误 / 读取超时的同模型重试次数
+  connect_timeout_seconds: 8.0      # TCP 连接建立超时（秒），建议 5~10s，防止目标机宕机时死等
+  connect_max_retries: 1            # 网络连接不通/超时时的快速重试次数（默认 1 次，避免客户端等待过长）
+  retry_on: [429, 500, 502, 503, 504]  # 触发切模型的状态码（可加 401, 402）
+  timeout_seconds: 120              # httpx 读取超时（秒）
+  backoff_base: 1.0
+  backoff_max: 30.0
+  first_token_timeout: 0            # 流式首 chunk 超时（秒），0=不启用，建议 30
+
+# ----------------------------------------------------------
+# 熔断器
+# ----------------------------------------------------------
+circuit_breaker:
+  enabled: true
+  failure_threshold: 2
+  local_failure_threshold: 3
+  success_threshold: 1
+  cooldown_base: 30
+  cooldown_max: 3000
+  jitter: 0.2
+  window_size: 20
+  slow_response_enabled: true
+  slow_response_threshold_ms: 15000
+  slow_response_failure_threshold: 3
+
+# ----------------------------------------------------------
+# 会话上下文
+# ----------------------------------------------------------
+context:
+  enabled: true
+  max_conversations: 200
+  history_window: 3
+
+# ----------------------------------------------------------
+# 日志
+# ----------------------------------------------------------
+logging:
+  level: "INFO"
+  db_path: "logs/requests.db"
+  content_logging_enabled: false  # 默认只记录元数据，不保存请求、响应、Prompt 内容
+  artifact_storage_enabled: false # 默认不将大 tool output 写入 SQLite
+  body_max_size: 5120
+  full_body_max_size: 10240
+  retention_days:
+    request_bodies: 3
+    request_logs: 30
+    error_logs: 90
+    rewrite_logs: 30
+    server_logs: 7
+    rewrite_files: 7
+    artifacts: 1
+  tool_call_cache:
+    ttl_seconds: 3600
+    max_size: 1000
+    persist: false                 # 默认仅内存缓存，不保存 tool 参数
+
+# ----------------------------------------------------------
+# 智能改写（可选）
+# ----------------------------------------------------------
+rewriting:
+  enabled: false
+  mode: "classify_only"             # classify_only / rewrite_only / classify_and_rewrite / passthrough
+  rewriter_model: ""
+  fallback_to_original: true
+  add_plan: false
+  tier_template_map:
+    simple: "small"
+    mid: "large"
+    complex: "large"
+  transforms:
+    clarity: true
+    structure: true
+    completeness: false
+  max_rewriter_tokens: 2048
+  timeout_seconds: 30
+  rewriter_timeout_enabled: true
+  rewriter_timeout_seconds: 20
+  temperature: 0.3
+  top_p: 0.9
+  thinking_enabled: true
+  thinking_params:
+    thinking:
+      type: "enabled"
+  rewrite_small_prompt: "prism_router/prompts/rewrite_small.md"
+  rewrite_large_prompt: "prism_router/prompts/rewrite_large.md"
+  rewrite_log_dir: "logs/rewrites"
+  write_rewrite_logs: false        # 默认不将改写前后 Prompt 写入文件
+  cli_timeout: 5
+  skip_rewrite_keywords:
+    - "title"
+    - "summarize"
+    - "summarise"
+  skip_rewrite_patterns: []
+  context_local_rounds: 2
+  context_local_max_chars: 200
+  context_cloud_rounds: 4
+  context_cloud_max_chars: 400
+  breaker_enabled: true
+  breaker_failure_threshold: 3
+  breaker_cooldown_base: 30
+  breaker_cooldown_max: 600
+  probe_enabled: true
+  probe_interval: 30
